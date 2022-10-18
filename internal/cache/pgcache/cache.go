@@ -2,8 +2,8 @@ package pgcache
 
 import (
 	"database/sql"
-	"errors"
 	"fmt"
+
 	_ "github.com/lib/pq"
 )
 
@@ -36,24 +36,13 @@ func (cache *Cache) Connect() {
 }
 
 func (cache *Cache) Get(key string) (string, error) {
-	rows, err := cache.Db.Query("select document from cache where key = $1", key)
+	var document string
 
-	if err != nil {
+	if err := cache.Db.QueryRow("select document from cache where key = $1", key).Scan(&document); err != nil {
 		return "", err
 	}
 
-	defer rows.Close()
-
-	for rows.Next() {
-		var document string
-		if err := rows.Scan(&document); err != nil {
-			return "", err
-		}
-
-		return document, nil
-	}
-
-	return "", errors.New("not found")
+	return document, nil
 }
 
 func (cache *Cache) Create(key string, document []byte) error {

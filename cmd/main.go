@@ -3,7 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -61,12 +61,12 @@ func (handler *CacheHandler) get(w http.ResponseWriter, r *http.Request, p httpr
 
 	if err != nil {
 		w.WriteHeader(http.StatusNotFound)
-		fmt.Fprintf(w, err.Error())
+		fmt.Fprint(w, err.Error())
 		return
 	}
 
 	w.WriteHeader(http.StatusOK)
-	fmt.Fprintf(w, document)
+	fmt.Fprint(w, document)
 }
 
 func (handler *CacheHandler) create(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
@@ -74,7 +74,7 @@ func (handler *CacheHandler) create(w http.ResponseWriter, r *http.Request, p ht
 	w.Header().Set("Pragma", "no-cache")
 	w.Header().Set("Cache-Control", "no-store")
 
-	document, err := ioutil.ReadAll(r.Body)
+	document, err := io.ReadAll(r.Body)
 	if err != nil {
 		fmt.Fprintf(w, "Cannot not read body: %s\n", err)
 		return
@@ -85,17 +85,17 @@ func (handler *CacheHandler) create(w http.ResponseWriter, r *http.Request, p ht
 	if err != nil {
 		if strings.Contains(err.Error(), "duplicate key value violates unique constraint") {
 			w.WriteHeader(http.StatusConflict)
-			fmt.Fprintf(w, err.Error())
+			fmt.Fprint(w, err.Error())
 			return
 		}
 
 		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprintf(w, err.Error())
+		fmt.Fprint(w, err.Error())
 		return
 	}
 
 	w.WriteHeader(http.StatusCreated)
-	fmt.Fprintf(w, "")
+	fmt.Fprint(w, "")
 }
 
 func (handler *CacheHandler) update(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
@@ -103,7 +103,7 @@ func (handler *CacheHandler) update(w http.ResponseWriter, r *http.Request, p ht
 	w.Header().Set("Pragma", "no-cache")
 	w.Header().Set("Cache-Control", "no-store")
 
-	document, err := ioutil.ReadAll(r.Body)
+	document, err := io.ReadAll(r.Body)
 	if err != nil {
 		fmt.Fprintf(w, "Cannot not read body: %s\n", err)
 		return
@@ -113,12 +113,12 @@ func (handler *CacheHandler) update(w http.ResponseWriter, r *http.Request, p ht
 
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprintf(w, err.Error())
+		fmt.Fprint(w, err.Error())
 		return
 	}
 
 	w.WriteHeader(http.StatusNoContent)
-	fmt.Fprintf(w, "")
+	fmt.Fprint(w, "")
 }
 
 func (handler *CacheHandler) delete(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
@@ -130,7 +130,7 @@ func (handler *CacheHandler) delete(w http.ResponseWriter, r *http.Request, p ht
 
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprintf(w, err.Error())
+		fmt.Fprint(w, err.Error())
 		return
 	}
 
@@ -147,7 +147,7 @@ func (handler *CacheHandler) clean(w http.ResponseWriter, r *http.Request, p htt
 
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprintf(w, err.Error())
+		fmt.Fprint(w, err.Error())
 		return
 	}
 
