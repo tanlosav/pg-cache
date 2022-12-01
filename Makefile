@@ -21,4 +21,4 @@ build-linux-amd64: check
 	GOOS=linux GOARCH=amd64 go build -o ./build/pg-cache-linux-amd64 ./cmd
 
 test: check
-	go run ./cmd/main.go
+	go run ./cmd/main.go --configuration-provider file --configuration-source ./test/config.yml

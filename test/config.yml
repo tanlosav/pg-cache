@@ -1,0 +1,48 @@
+db:
+  host: localhost:5432
+  name: cache
+  user: pgcache
+  password: password
+
+cache:
+  buckets:
+    simple_kv:
+      keysCount: 1
+      sharding:
+        partitionName: simple
+        partitionsCount: 2
+        # virtualBucketsCount: 1024
+      indexes:
+        string_index:
+          type: string
+          rule: "$.indexedString"
+          sharding:
+            partitionName: simple_string_index
+            partitionsCount: 2
+            # virtualBucketsCount: 1024
+        array_index:
+          type: array
+          rule: "$.indexed_array[*].value"
+          sharding:
+            partitionName: simple_array_index
+            partitionsCount: 2
+            # virtualBucketsCount: 1024
+    composite_kv:
+      keysCount: 2
+      sharding:
+        partitionName: composite
+        partitionsCount: 2
+        # virtualBucketsCount: 1024
+  # indexer: disabled
+  # indexer: sync
+  # indexer: async
+  # asyncIndexerSettings:
+  #   corePoolSize: 2
+  #   maxPoolSize: 10
+  #   queueCapacity: 100
+  #   awaitTerminationSeconds: 30
+  #   waitForTasksToCompleteOnShutdown: true
+  # hash: md5
+  # hash: murmur32
+  # hash: murmur128
+  # hash: crc32c
