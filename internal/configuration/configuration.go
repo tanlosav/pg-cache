@@ -11,6 +11,7 @@ type Configuration struct {
 
 type Cache struct {
 	Buckets map[string]Bucket `yaml:"buckets"`
+	Hash    string            `yaml:"hash"`
 }
 
 type Db struct {

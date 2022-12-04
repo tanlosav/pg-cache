@@ -7,7 +7,7 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"github.com/tanlosav/pg-cache/internal/cache"
+	"github.com/tanlosav/pg-cache/internal/cache/pgcache"
 	"github.com/tanlosav/pg-cache/internal/configuration"
 )
 
@@ -24,11 +24,8 @@ func main() {
 	opts := parseOptions()
 	setupLogger()
 	config := getConfiguration(opts)
-	cache := cache.NewPgCache(config)
-	cache.Connect()
-	cache.Init()
+	pgcache.NewCache(config)
 
-	// todo: create partitions
 	// todo: start router
 
 	// handler := CacheHandler{

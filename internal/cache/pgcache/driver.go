@@ -1,4 +1,4 @@
-package cache
+package pgcache
 
 import (
 	"database/sql"
@@ -13,36 +13,24 @@ import (
 	"github.com/tanlosav/pg-cache/internal/configuration"
 )
 
-type Cache struct {
-	config     configuration.Configuration
-	dbSettings map[string]configuration.Bucket
-	db         *sql.DB
-	tx         *sql.Tx
+type Driver struct {
+	config configuration.Configuration
+	db     *sql.DB
 }
 
 const (
-	CACHE_SETTINGS_TABLE string = "pg_cache_settings"
+	CACHE_SETTINGS_TABLE string = "cache_settings"
 	CACHE_LOCKS_SETTINGS int    = 1001
 )
 
-func NewPgCache(config configuration.Configuration) *Cache {
-	return &Cache{
+func NewDriver(config configuration.Configuration) *Driver {
+	return &Driver{
 		config: config,
 	}
 }
 
-func (cache *Cache) Connect() {
-	addr := fmt.Sprintf("postgres://%s:%s@%s/%s?sslmode=disable", cache.config.Db.User, cache.config.Db.Password, cache.config.Db.Host, cache.config.Db.Name)
-	db, err := sql.Open("postgres", addr)
-
-	if err != nil {
-		panic(err)
-	}
-
-	cache.db = db
-}
-
-func (cache *Cache) Init() {
+func (cache *Driver) Init() {
+	cache.connect()
 	cache.createDatabaseSchema()
 
 	tx, err := cache.db.Begin()
@@ -51,21 +39,28 @@ func (cache *Cache) Init() {
 	}
 	defer tx.Rollback()
 
-	cache.tx = tx
+	cache.lockSettingsTable(tx)
+	dbSettings := cache.getDatabaseSettings(tx)
 
-	cache.lockSettingsTable()
-	defer cache.tx.Rollback()
-
-	cache.getDatabaseSettings()
-
-	if len(cache.dbSettings) == 0 {
+	if len(dbSettings) == 0 {
 		log.Debug().Msg("Register cache settings to database.")
 		cache.createPartitions()
-		cache.storeDatabaseSettings()
-		cache.tx.Commit()
-	} else if !reflect.DeepEqual(cache.config.Cache.Buckets, cache.dbSettings) {
+		cache.storeDatabaseSettings(tx)
+		tx.Commit()
+	} else if !reflect.DeepEqual(cache.config.Cache.Buckets, dbSettings) {
 		panic("Please check cache settings. Database contains different configuration of the cache.")
 	}
+}
+
+func (cache *Driver) connect() {
+	addr := fmt.Sprintf("postgres://%s:%s@%s/%s?sslmode=disable", cache.config.Db.User, cache.config.Db.Password, cache.config.Db.Host, cache.config.Db.Name)
+	db, err := sql.Open("postgres", addr)
+
+	if err != nil {
+		panic(err)
+	}
+
+	cache.db = db
 }
 
 // func (cache *Cache) Get(key string) (string, error) {
@@ -119,22 +114,22 @@ func (cache *Cache) Init() {
 // }
 
 // createDatabaseSchema create database schema.
-func (cache *Cache) createDatabaseSchema() {
+func (cache *Driver) createDatabaseSchema() {
 	_, err := cache.db.Exec("create table if not exists " + CACHE_SETTINGS_TABLE + "(bucket varchar(128) not null primary key, settings varchar(1024))")
 	if err != nil {
 		panic(err)
 	}
 }
 
-// getDatabaseSettings get stored settings for all bucket from database.
-func (cache *Cache) getDatabaseSettings() {
-	rows, err := cache.tx.Query("select bucket, settings from " + CACHE_SETTINGS_TABLE)
+// getDatabaseSettings get stored settings for all buckets from database.
+func (cache *Driver) getDatabaseSettings(tx *sql.Tx) map[string]configuration.Bucket {
+	rows, err := tx.Query("select bucket, settings from " + CACHE_SETTINGS_TABLE)
 	if err != nil {
 		panic(err)
 	}
 	defer rows.Close()
 
-	cache.dbSettings = make(map[string]configuration.Bucket)
+	dbSettings := make(map[string]configuration.Bucket)
 
 	for rows.Next() {
 		var bucket string
@@ -151,7 +146,7 @@ func (cache *Cache) getDatabaseSettings() {
 			panic(err)
 		}
 
-		cache.dbSettings[bucket] = bucketOpts
+		dbSettings[bucket] = bucketOpts
 	}
 
 	err = rows.Err()
@@ -159,18 +154,20 @@ func (cache *Cache) getDatabaseSettings() {
 		panic(err)
 	}
 
-	log.Printf("Database configuration: %+v", cache.dbSettings)
+	log.Printf("Database configuration: %+v", dbSettings)
+
+	return dbSettings
 }
 
 // storeDatabaseSettings store cache settings to database.
-func (cache *Cache) storeDatabaseSettings() {
+func (cache *Driver) storeDatabaseSettings(tx *sql.Tx) {
 	for bucket, settings := range cache.config.Cache.Buckets {
 		value, err := json.Marshal(settings)
 		if err != nil {
 			panic(err)
 		}
 
-		_, err = cache.tx.Exec("insert into "+CACHE_SETTINGS_TABLE+"(bucket, settings) values($1, $2)", bucket, value)
+		_, err = tx.Exec("insert into "+CACHE_SETTINGS_TABLE+"(bucket, settings) values($1, $2)", bucket, value)
 		if err != nil {
 			panic(err)
 		}
@@ -178,7 +175,7 @@ func (cache *Cache) storeDatabaseSettings() {
 }
 
 // createPartitions create partitions for each bucket.
-func (cache *Cache) createPartitions() {
+func (cache *Driver) createPartitions() {
 	for bucket, settings := range cache.config.Cache.Buckets {
 		for i := 0; i < settings.Sharding.PartitionsCount; i++ {
 			cache.createPartition(bucket, settings.KeysCount, settings.Sharding.Partition, i)
@@ -187,7 +184,7 @@ func (cache *Cache) createPartitions() {
 }
 
 // createPartition create single partition for the bucket.
-func (cache *Cache) createPartition(bucket string, keysCount int, partition string, index int) {
+func (cache *Driver) createPartition(bucket string, keysCount int, partition string, index int) {
 	primaryKeyColumns := make([]string, 0, keysCount)
 	partitionName := bucket + "_" + partition + strconv.Itoa(index)
 
@@ -211,10 +208,10 @@ func (cache *Cache) createPartition(bucket string, keysCount int, partition stri
 }
 
 // lockSettingsTable acquire lock for settings table to check configuration and create partitions.
-func (cache *Cache) lockSettingsTable() {
+func (cache *Driver) lockSettingsTable(tx *sql.Tx) {
 	log.Debug().Msg("Acquire lock on settings table.")
 
-	_, err := cache.tx.Exec("select pg_advisory_xact_lock(" + strconv.Itoa(CACHE_LOCKS_SETTINGS) + ")")
+	_, err := tx.Exec("select pg_advisory_xact_lock(" + strconv.Itoa(CACHE_LOCKS_SETTINGS) + ")")
 	if err != nil {
 		panic(err)
 	}
