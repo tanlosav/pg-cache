@@ -54,10 +54,6 @@ func (conf *FileSource) applyBucketDefaultValues() {
 			opts.Sharding.PartitionsCount = DEFAULT_PARTITIONS_COUNT
 		}
 
-		if opts.Sharding.VirtualBucketsCount == 0 {
-			opts.Sharding.VirtualBucketsCount = DEFAULT_VIRTUAL_BUCKETS_COUNT
-		}
-
 		conf.config.Cache.Buckets[bucket] = opts
 	}
 }

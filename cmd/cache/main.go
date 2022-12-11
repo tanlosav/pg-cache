@@ -1,30 +1,24 @@
 package main
 
 import (
-	"flag"
-	"os"
-	"time"
-
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 	"github.com/tanlosav/pg-cache/internal/cache/pgcache"
+	"github.com/tanlosav/pg-cache/internal/cmd"
 	"github.com/tanlosav/pg-cache/internal/configuration"
+	"github.com/tanlosav/pg-cache/internal/db"
+	"github.com/tanlosav/pg-cache/internal/logger"
 )
-
-type CmdLineOpts struct {
-	ConfigurationProvider string
-	ConfigurationSource   string
-}
 
 // type CacheHandler struct {
 // 	Cache *pgcache.Cache
 // }
 
 func main() {
-	opts := parseOptions()
-	setupLogger()
-	config := getConfiguration(opts)
-	pgcache.NewCache(config)
+	opts := cmd.ParseOptions()
+	logger.SetupLogger()
+	config := configuration.NewConfiguration(opts)
+	driver := db.NewDriver(config)
+	driver.Connect()
+	pgcache.NewCache(config, driver)
 
 	// todo: start router
 
@@ -49,38 +43,22 @@ func main() {
 	// log.Fatal(server.ListenAndServe())
 }
 
-func parseOptions() *CmdLineOpts {
-	configProvider := flag.String("configuration-provider", "file", "Configuration provider")
-	configSource := flag.String("configuration-source", "", "Configuration source")
+// func getConfiguration(opts *CmdLineOpts) *configuration.Configuration {
+// 	var configProvider configuration.ConfigurationSource
 
-	flag.Parse()
+// 	switch opts.ConfigurationProvider {
+// 	case "file":
+// 		configProvider = configuration.NewFileSource()
+// 	default:
+// 		panic("Unsupported configuration provider")
+// 	}
 
-	return &CmdLineOpts{
-		ConfigurationProvider: *configProvider,
-		ConfigurationSource:   *configSource,
-	}
-}
+// 	config := configProvider.Configuration(opts.ConfigurationSource)
 
-func setupLogger() {
-	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stdout, NoColor: true, TimeFormat: time.RFC3339Nano}).With().Caller().Logger()
-}
+// 	log.Printf("Loaded configuration: %+v", config)
 
-func getConfiguration(opts *CmdLineOpts) configuration.Configuration {
-	var configProvider configuration.ConfigurationSource
-
-	switch opts.ConfigurationProvider {
-	case "file":
-		configProvider = configuration.NewFileSource()
-	default:
-		panic("Unsupported configuration provider")
-	}
-
-	config := configProvider.Configuration(opts.ConfigurationSource)
-
-	log.Printf("Loaded configuration: %+v", config)
-
-	return config
-}
+// 	return &config
+// }
 
 // func (handler *CacheHandler) get(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 // 	w.Header().Set("Content-Type", "application/json")

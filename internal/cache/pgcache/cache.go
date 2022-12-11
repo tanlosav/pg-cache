@@ -2,17 +2,15 @@ package pgcache
 
 import (
 	"github.com/tanlosav/pg-cache/internal/configuration"
+	"github.com/tanlosav/pg-cache/internal/db"
 )
 
 type Cache struct {
-	config configuration.Configuration
-	driver *Driver
+	config *configuration.Configuration
+	driver *db.Driver
 }
 
-func NewCache(config configuration.Configuration) *Cache {
-	driver := NewDriver(config)
-	driver.Init()
-
+func NewCache(config *configuration.Configuration, driver *db.Driver) *Cache {
 	return &Cache{
 		config: config,
 		driver: driver,

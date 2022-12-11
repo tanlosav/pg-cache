@@ -22,21 +22,20 @@ func NewPartitionManager(config configuration.Configuration) *PartitionManager {
 	}
 }
 
+// todo: calculate instance id
 func (pm *PartitionManager) GetPartition(bucket string, key string) string {
 	bucketSettings := pm.config.Cache.Buckets[bucket]
 	partitionName := bucketSettings.Sharding.Partition
-	vbCount := bucketSettings.Sharding.VirtualBucketsCount
 	partitionsCount := bucketSettings.Sharding.PartitionsCount
-	partitionNumber := pm.getPartitionNumber(key, vbCount, partitionsCount)
+	partitionNumber := pm.getPartitionNumber(key, partitionsCount)
 
 	return fmt.Sprintf("%s_%d", partitionName, partitionNumber)
 }
 
-func (pm *PartitionManager) getPartitionNumber(key string, vbCount int, partitionsCount int) int64 {
+func (pm *PartitionManager) getPartitionNumber(key string, partitionsCount int) int64 {
 	hash := pm.getHash(key)
-	vbNumber := pm.calculateVirtualBucketNumber(hash, vbCount)
 
-	return pm.calculatePartitionNumber(vbNumber, partitionsCount)
+	return pm.calculatePartitionNumber(hash, partitionsCount)
 }
 
 func (pm *PartitionManager) getHash(value string) []byte {
@@ -46,21 +45,9 @@ func (pm *PartitionManager) getHash(value string) []byte {
 	return pm.digest.Sum(nil)
 }
 
-func (pm *PartitionManager) calculateVirtualBucketNumber(hash []byte, vbCount int) int64 {
+func (pm *PartitionManager) calculatePartitionNumber(hash []byte, partitionsCount int) int64 {
 	a := new(big.Int)
 	a.SetString(string(hash), 10)
-
-	b := new(big.Int)
-	b.SetInt64(int64(vbCount))
-
-	modulo := new(big.Int)
-
-	return modulo.Mod(a, b).Int64()
-}
-
-func (pm *PartitionManager) calculatePartitionNumber(vbNumber int64, partitionsCount int) int64 {
-	a := new(big.Int)
-	a.SetInt64(vbNumber)
 
 	b := new(big.Int)
 	b.SetInt64(int64(partitionsCount))
