@@ -29,13 +29,30 @@ type Db struct {
 type Bucket struct {
 	KeysCount int `yaml:"keysCount"`
 	Sharding  struct {
-		Partition       string `yaml:"partitionName"`
-		PartitionsCount int    `yaml:"partitionsCount"`
+		PartitionsCount int `yaml:"partitionsCount"`
 	} `yaml:"sharding"`
+	Eviction Eviction `yaml:"eviction"`
+}
+
+type Eviction struct {
+	Policy                   string `yaml:"policy"`
+	PartitionTimeRange       int    `yaml:"partitionTimeRange"`
+	ActualPartitionsCount    int    `yaml:"actualPartitionsCount"`
+	RemainingPartitionsCount int    `yaml:"remainingPartitionsCount"`
 }
 
 const (
-	DEFAULT_PARTITIONS_COUNT = 100
+	DEFAULT_PARTITIONS_COUNT           = 1
+	DEFAULT_EVICTION_POLICY            = EVICTION_POLICY_NONE
+	DEFAULT_PARTITION_TIME_RANGE       = 3600
+	DEFAULT_ACTUAL_PARTITIONS_COUNT    = 2
+	DEFAULT_REMAINING_PARTITIONS_COUNT = 1
+)
+
+const (
+	EVICTION_POLICY_NONE     = "none"
+	EVICTION_POLICY_DELETE   = "delete"
+	EVICTION_POLICY_TRUNCATE = "truncate"
 )
 
 func NewConfiguration(opts *cmd.CmdLineOpts) *Configuration {
@@ -53,4 +70,30 @@ func NewConfiguration(opts *cmd.CmdLineOpts) *Configuration {
 	log.Printf("Loaded configuration: %+v", config)
 
 	return &config
+}
+
+func applyBucketDefaultValues(conf *Configuration) {
+	for bucket, opts := range conf.Cache.Buckets {
+		if opts.Sharding.PartitionsCount == 0 {
+			opts.Sharding.PartitionsCount = DEFAULT_PARTITIONS_COUNT
+		}
+
+		if opts.Eviction.Policy == "" {
+			opts.Eviction.Policy = DEFAULT_EVICTION_POLICY
+		}
+
+		if opts.Eviction.PartitionTimeRange == 0 {
+			opts.Eviction.PartitionTimeRange = DEFAULT_PARTITION_TIME_RANGE
+		}
+
+		if opts.Eviction.ActualPartitionsCount == 0 {
+			opts.Eviction.ActualPartitionsCount = DEFAULT_ACTUAL_PARTITIONS_COUNT
+		}
+
+		if opts.Eviction.RemainingPartitionsCount == 0 {
+			opts.Eviction.RemainingPartitionsCount = DEFAULT_REMAINING_PARTITIONS_COUNT
+		}
+
+		conf.Cache.Buckets[bucket] = opts
+	}
 }

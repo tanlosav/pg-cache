@@ -41,19 +41,9 @@ func (conf *FileSource) load(source string) {
 		panic(err)
 	}
 
-	conf.applyBucketDefaultValues()
+	applyBucketDefaultValues(&conf.config)
 
 	log.Info().Msg("Configuration loaded")
 
 	conf.initialized = true
-}
-
-func (conf *FileSource) applyBucketDefaultValues() {
-	for bucket, opts := range conf.config.Cache.Buckets {
-		if opts.Sharding.PartitionsCount == 0 {
-			opts.Sharding.PartitionsCount = DEFAULT_PARTITIONS_COUNT
-		}
-
-		conf.config.Cache.Buckets[bucket] = opts
-	}
 }

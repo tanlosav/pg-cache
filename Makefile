@@ -14,22 +14,44 @@ verify: fmt
 
 check: fmt vet staticcheck
 
-
-build-schema: check
-	go build -o ./build/pg-schema ./cmd/schema
-
-build-schema-linux-amd64: check
-	GOOS=linux GOARCH=amd64 go build -o ./build/pg-schema-linux-amd64 ./cmd/schema
-
-test-schema: check
-	go run ./cmd/schema/main.go --configuration-provider file --configuration-source ./test/config.yml
+test: check
+	go test ./...
 
 
-build-cache: check
-	go build -o ./build/pg-cache ./cmd/cache
+#
+# partitioner
+#
+build-partitioner: check
+	go build -o ./build/partitioner ./cmd/partitioner
 
-build-cache-linux-amd64: check
-	GOOS=linux GOARCH=amd64 go build -o ./build/pg-cache-linux-amd64 ./cmd/cache
+build-partitioner-linux-amd64: check
+	GOOS=linux GOARCH=amd64 go build -o ./build/partitioner-linux-amd64 ./cmd/partitioner
 
-test-cache: check
-	go run ./cmd/cache/main.go --configuration-provider file --configuration-source ./test/config.yml
+run-partitioner: check
+	go run ./cmd/partitioner/main.go --configuration-provider file --configuration-source ./test/config.yml
+
+
+#
+# rest-api-gateway
+#
+build-rest-api-gateway: check
+	go build -o ./build/rest-api-gateway ./cmd/rest-api-gateway
+
+build-rest-api-gateway-linux-amd64: check
+	GOOS=linux GOARCH=amd64 go build -o ./build/rest-api-gateway-linux-amd64 ./cmd/rest-api-gateway
+
+run-rest-api-gateway: check
+	go run ./cmd/rest-api-gateway/main.go --configuration-provider file --configuration-source ./test/config.yml
+
+
+#
+# dev env
+#
+dev-env-start:
+	./scripts/dev-env-start.sh
+
+dev-env-ps:
+	./scripts/dev-env-ps.sh
+
+dev-env-down:
+	./scripts/dev-env-down.sh

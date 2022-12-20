@@ -25,11 +25,10 @@ func NewPartitionManager(config configuration.Configuration) *PartitionManager {
 // todo: calculate instance id
 func (pm *PartitionManager) GetPartition(bucket string, key string) string {
 	bucketSettings := pm.config.Cache.Buckets[bucket]
-	partitionName := bucketSettings.Sharding.Partition
 	partitionsCount := bucketSettings.Sharding.PartitionsCount
 	partitionNumber := pm.getPartitionNumber(key, partitionsCount)
 
-	return fmt.Sprintf("%s_%d", partitionName, partitionNumber)
+	return fmt.Sprintf("%s_%d", bucket, partitionNumber)
 }
 
 func (pm *PartitionManager) getPartitionNumber(key string, partitionsCount int) int64 {

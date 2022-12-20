@@ -6,33 +6,45 @@ db:
 
 cache:
   buckets:
-    simple_kv:
+    simple:
       keysCount: 1
       sharding:
-        partitionName: simple
         partitionsCount: 2
-        # virtualBucketsCount: 1024
       indexes:
         string_index:
           type: string
           rule: "$.indexedString"
           sharding:
-            partitionName: simple_string_index
             partitionsCount: 2
-            # virtualBucketsCount: 1024
         array_index:
           type: array
           rule: "$.indexed_array[*].value"
           sharding:
-            partitionName: simple_array_index
             partitionsCount: 2
-            # virtualBucketsCount: 1024
-    composite_kv:
+    composite:
       keysCount: 2
       sharding:
-        partitionName: composite
         partitionsCount: 2
-        # virtualBucketsCount: 1024
+    eviction_truncate:
+      keysCount: 1
+      eviction:
+        policy: truncate
+        partitionTimeRange: 60
+        actualPartitionsCount: 2
+        remainingPartitionsCount: 1
+      sharding:
+        partitionsCount: 2
+      indexes:
+        string_index:
+          type: string
+          rule: "$.indexedString"
+          sharding:
+            partitionsCount: 2
+        array_index:
+          type: array
+          rule: "$.indexed_array[*].value"
+          sharding:
+            partitionsCount: 2
   # indexer: disabled
   # indexer: sync
   # indexer: async
