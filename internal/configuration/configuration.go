@@ -10,8 +10,9 @@ type ConfigurationSource interface {
 }
 
 type Configuration struct {
-	Db    Db    `yaml:"db"`
-	Cache Cache `yaml:"cache"`
+	Db     Db     `yaml:"db"`
+	Cache  Cache  `yaml:"cache"`
+	Server Server `yaml:"server"`
 }
 
 type Cache struct {
@@ -41,12 +42,17 @@ type Eviction struct {
 	RemainingPartitionsCount int    `yaml:"remainingPartitionsCount"`
 }
 
+type Server struct {
+	Port int `yaml:"port"`
+}
+
 const (
 	DEFAULT_PARTITIONS_COUNT           = 1
 	DEFAULT_EVICTION_POLICY            = EVICTION_POLICY_NONE
 	DEFAULT_PARTITION_TIME_RANGE       = 3600
 	DEFAULT_ACTUAL_PARTITIONS_COUNT    = 2
 	DEFAULT_REMAINING_PARTITIONS_COUNT = 1
+	DEFAULT_SERVER_PORT                = 8080
 )
 
 const (
@@ -95,5 +101,9 @@ func applyBucketDefaultValues(conf *Configuration) {
 		}
 
 		conf.Cache.Buckets[bucket] = opts
+	}
+
+	if conf.Server.Port == 0 {
+		conf.Server.Port = DEFAULT_SERVER_PORT
 	}
 }

@@ -43,23 +43,6 @@ func main() {
 	// log.Fatal(server.ListenAndServe())
 }
 
-// func getConfiguration(opts *CmdLineOpts) *configuration.Configuration {
-// 	var configProvider configuration.ConfigurationSource
-
-// 	switch opts.ConfigurationProvider {
-// 	case "file":
-// 		configProvider = configuration.NewFileSource()
-// 	default:
-// 		panic("Unsupported configuration provider")
-// 	}
-
-// 	config := configProvider.Configuration(opts.ConfigurationSource)
-
-// 	log.Printf("Loaded configuration: %+v", config)
-
-// 	return &config
-// }
-
 // func (handler *CacheHandler) get(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 // 	w.Header().Set("Content-Type", "application/json")
 // 	w.Header().Set("Pragma", "no-cache")

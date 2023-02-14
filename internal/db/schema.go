@@ -6,33 +6,34 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/rs/zerolog/log"
 	"github.com/tanlosav/pg-cache/internal/configuration"
 )
 
-type Schema struct {
-	config *configuration.Configuration
-	driver *Driver
-}
-
 const (
-	CACHE_SETTINGS_TABLE string = "cache_settings"
-	CACHE_LOCKS_SETTINGS int    = 1001
+	CACHE_SETTINGS_TABLE    string = "cache_settings"
+	CACHE_LOCKS_SETTINGS_ID string = "1001"
 )
+
+type Schema struct {
+	config           *configuration.Configuration
+	driver           *Driver
+	partitionManager *PartitionManager
+}
 
 func NewSchema(config *configuration.Configuration, driver *Driver) *Schema {
 	return &Schema{
-		config: config,
-		driver: driver,
+		config:           config,
+		driver:           driver,
+		partitionManager: NewPartitionManager(driver),
 	}
 }
 
 func (s *Schema) Init() {
 	s.createDatabaseSchema()
 
-	tx, err := s.driver.db.Begin()
+	tx, err := s.driver.Db.Begin()
 	if err != nil {
 		panic(err)
 	}
@@ -42,26 +43,28 @@ func (s *Schema) Init() {
 	dbSettings := s.getDatabaseSettings(tx)
 
 	if len(dbSettings) == 0 {
-		log.Debug().Msg("Register cache settings to database.")
+		log.Debug().Msg("Register cache settings.")
 		s.createBuckets()
 		s.storeDatabaseSettings(tx)
 		tx.Commit()
 	} else if !reflect.DeepEqual(s.config.Cache.Buckets, dbSettings) {
 		panic("Please check cache settings. Database contains different configuration of the cache.")
 	}
+
+	NewScheduler(s.config, s.partitionManager).start()
 }
 
 func (s *Schema) lockSettingsTable(tx *sql.Tx) {
 	log.Debug().Msg("Acquire lock on settings table.")
 
-	_, err := tx.Exec("select pg_advisory_xact_lock(" + strconv.Itoa(CACHE_LOCKS_SETTINGS) + ")")
+	_, err := tx.Exec("select pg_advisory_xact_lock(" + CACHE_LOCKS_SETTINGS_ID + ")")
 	if err != nil {
 		panic(err)
 	}
 }
 
 func (s *Schema) createDatabaseSchema() {
-	_, err := s.driver.db.Exec("create table if not exists " + CACHE_SETTINGS_TABLE + "(bucket varchar(128) not null primary key, settings varchar(1024))")
+	_, err := s.driver.Db.Exec("create table if not exists " + CACHE_SETTINGS_TABLE + "(bucket varchar(128) not null primary key, settings varchar(1024))")
 	if err != nil {
 		panic(err)
 	}
@@ -127,13 +130,13 @@ func (s *Schema) createBuckets() {
 }
 
 func (s *Schema) createBucket(bucket string, keysCount int, partitionNumber int, eviction configuration.Eviction) {
-	primaryKeyColumns := make([]string, 0, keysCount)
+	primaryKeyColumns := make([]string, keysCount)
 	tableName := bucket + "_" + strconv.Itoa(partitionNumber)
 
 	stmt := "create table " + tableName + "("
 	for i := 0; i < keysCount; i++ {
 		primaryKeyColumn := "key_" + strconv.Itoa(i)
-		primaryKeyColumns = append(primaryKeyColumns, primaryKeyColumn)
+		primaryKeyColumns[i] = primaryKeyColumn
 		stmt += primaryKeyColumn + " varchar not null,"
 	}
 
@@ -148,41 +151,14 @@ func (s *Schema) createBucket(bucket string, keysCount int, partitionNumber int,
 
 	log.Debug().Msg("Create table '" + tableName + "' with statement: " + stmt)
 
-	_, err := s.driver.db.Exec(stmt)
+	_, err := s.driver.Db.Exec(stmt)
 	if err != nil {
 		panic(err)
 	}
 
 	if configuration.EVICTION_POLICY_TRUNCATE == eviction.Policy {
-		s.createTablePartitions(tableName, eviction.PartitionTimeRange, eviction.ActualPartitionsCount)
+		bordersList := s.partitionManager.actualBorders(tableName, eviction.PartitionTimeRange, eviction.ActualPartitionsCount)
+		s.partitionManager.createNew(tableName, bordersList)
+		s.partitionManager.removeOld(tableName, bordersList)
 	}
-}
-
-func (s *Schema) createTablePartitions(tableName string, timeRange int, count int) {
-	now := time.Now().Unix()
-	timeRangeInt64 := int64(timeRange)
-	countInt64 := int64(count)
-
-	for i := int64(0); i < countInt64; i++ {
-		startValue, endValue := getPartitionBorders(now, timeRangeInt64, i)
-
-		from := strconv.FormatInt(startValue, 10)
-		to := strconv.FormatInt(endValue, 10)
-		partitionName := tableName + "_" + from + "_" + to
-
-		stmt := "create table " + partitionName + " partition of " + tableName + " for values from (" + from + ") to (" + to + ")"
-		log.Debug().Msg("Create partition '" + partitionName + "' with statement: " + stmt)
-
-		_, err := s.driver.db.Exec(stmt)
-		if err != nil {
-			panic(err)
-		}
-	}
-}
-
-func getPartitionBorders(now int64, timeRange int64, offset int64) (int64, int64) {
-	start := now/timeRange*timeRange + timeRange*offset
-	end := start + timeRange
-
-	return start, end
 }

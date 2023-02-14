@@ -1,4 +1,4 @@
-package partition
+package pgcache
 
 import (
 	"crypto/md5"
